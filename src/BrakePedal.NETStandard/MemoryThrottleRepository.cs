@@ -1,31 +1,51 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-
-using Microsoft.Extensions.Caching.Memory;
-
-namespace BrakePedal.NETStandard
+﻿namespace BrakePedal.NETStandard
 {
-    public class MemoryThrottleRepository : IThrottleRepository
+    using System;
+    using System.Collections.Generic;
+    using System.Linq;
+    using System.Threading.Tasks;
+
+    using Microsoft.Extensions.Caching.Memory;
+    using Microsoft.Extensions.Internal;
+
+    /// <summary>
+    /// 
+    /// </summary>
+    public partial class MemoryThrottleRepository : IThrottleRepository
     {
-        private readonly IMemoryCache _store;
+        readonly IMemoryCache _store;
+        readonly ISystemClock _clock;
 
-        // Setup as a function to allow for unit testing
-        public Func<DateTime> CurrentDate = () => DateTime.UtcNow;
-
-        public MemoryThrottleRepository(IMemoryCache cache)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="cache"></param>
+        public MemoryThrottleRepository(IMemoryCache cache, ISystemClock clock)
         {
             _store = cache;
+            _clock = clock;
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
         public MemoryThrottleRepository()
         {
             _store = new MemoryCache(new MemoryCacheOptions());
+            _clock = new SystemClock();
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
         public object[] PolicyIdentityValues { get; set; }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="limiter"></param>
+        /// <returns></returns>
         public long? GetThrottleCount(IThrottleKey key, Limiter limiter)
         {
             string id = CreateThrottleKey(key, limiter);
@@ -39,9 +59,20 @@ namespace BrakePedal.NETStandard
             return null;
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="limiter"></param>
+        /// <returns></returns>
         public Task<long?> GetThrottleCountAsync(IThrottleKey key, Limiter limiter)
             => Task.FromResult(GetThrottleCount(key, limiter));
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="limiter"></param>
         public void AddOrIncrementWithExpiration(IThrottleKey key, Limiter limiter)
         {
             string id = CreateThrottleKey(key, limiter);
@@ -56,106 +87,177 @@ namespace BrakePedal.NETStandard
                 cacheItem = new ThrottleCacheItem()
                 {
                     Count = 1,
-                    Expiration = CurrentDate().Add(limiter.Period)
+                    Expiration = _clock.UtcNow.UtcDateTime.Add(limiter.Period)
                 };
             }
 
             _store.Set(id, cacheItem, cacheItem.Expiration);
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="limiter"></param>
+        /// <returns></returns>
         public Task AddOrIncrementWithExpirationAsync(IThrottleKey key, Limiter limiter)
         {
             AddOrIncrementWithExpiration(key, limiter);
             return Task.CompletedTask;
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="limiter"></param>
         public void SetLock(IThrottleKey key, Limiter limiter)
         {
-            string throttleId = CreateThrottleKey(key, limiter);
+            var throttleId = CreateThrottleKey(key, limiter);
             _store.Remove(throttleId);
 
-            string lockId = CreateLockKey(key, limiter);
-            DateTime expiration = CurrentDate().Add(limiter.LockDuration.Value);
+            var lockId = CreateLockKey(key, limiter);
+            var expiration = _clock.UtcNow.DateTime.Add(limiter.LockDuration.Value);
+
             _store.Set(lockId, true, expiration);
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="limiter"></param>
+        /// <returns></returns>
         public Task SetLockAsync(IThrottleKey key, Limiter limiter)
         {
             SetLock(key, limiter);
             return Task.CompletedTask;
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="limiter"></param>
+        /// <returns></returns>
         public bool LockExists(IThrottleKey key, Limiter limiter)
         {
-            string lockId = CreateLockKey(key, limiter);
+            var lockId = CreateLockKey(key, limiter);
             return _store.TryGetValue(lockId, out _);
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="limiter"></param>
+        /// <returns></returns>
         public Task<bool> LockExistsAsync(IThrottleKey key, Limiter limiter)
             => Task.FromResult(LockExists(key, limiter));
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="limiter"></param>
         public void RemoveThrottle(IThrottleKey key, Limiter limiter)
         {
-            string lockId = CreateThrottleKey(key, limiter);
+            var lockId = CreateThrottleKey(key, limiter);
             _store.Remove(lockId);
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="limiter"></param>
+        /// <returns></returns>
         public Task RemoveThrottleAsync(IThrottleKey key, Limiter limiter)
         {
             RemoveThrottle(key, limiter);
             return Task.CompletedTask;
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="limiter"></param>
+        /// <returns></returns>
         public string CreateLockKey(IThrottleKey key, Limiter limiter)
         {
-            List<object> values = CreateBaseKeyValues(key, limiter);
+            var values = CreateBaseKeyValues(key, limiter);
 
-            string lockKeySuffix = TimeSpanToFriendlyString(limiter.LockDuration.Value);
+            var lockKeySuffix = TimeSpanToFriendlyString(limiter.LockDuration.Value);
             values.Add("lock");
             values.Add(lockKeySuffix);
 
-            string id = string.Join(":", values);
-            return id;
+            return string.Join(":", values);
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="limiter"></param>
+        /// <returns></returns>
         public Task<string> CreateLockKeyAsync(IThrottleKey key, Limiter limiter)
             => Task.FromResult(CreateLockKey(key, limiter));
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="limiter"></param>
+        /// <returns></returns>
         public string CreateThrottleKey(IThrottleKey key, Limiter limiter)
         {
-            List<object> values = CreateBaseKeyValues(key, limiter);
-
-            string countKey = TimeSpanToFriendlyString(limiter.Period);
+            var values = CreateBaseKeyValues(key, limiter);
+            var countKey = TimeSpanToFriendlyString(limiter.Period);
             values.Add(countKey);
 
             // Using the Unix timestamp to the key allows for better
             // precision when querying a key from Redis
             if (limiter.Period.TotalSeconds == 1)
+            {
                 values.Add(GetUnixTimestamp());
+            }
 
-            string id = string.Join(":", values);
-            return id;
+            return string.Join(":", values);
         }
 
-        public Task<string> CreateThrottleKeyAsync(IThrottleKey key, Limiter limiter)
-            => Task.FromResult(CreateThrottleKey(key, limiter));
-
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="limiter"></param>
+        /// <returns></returns>
         private List<object> CreateBaseKeyValues(IThrottleKey key, Limiter limiter)
         {
-            List<object> values = key.Values.ToList();
+            var values = key.Values.ToList();
+
             if (PolicyIdentityValues != null && PolicyIdentityValues.Length > 0)
+            {
                 values.InsertRange(0, PolicyIdentityValues);
+            }
 
             return values;
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="span"></param>
+        /// <returns></returns>
         private string TimeSpanToFriendlyString(TimeSpan span)
         {
             var items = new List<string>();
             Action<double, string> ifNotZeroAppend = (value, key) =>
             {
                 if (value != 0)
+                {
                     items.Add(string.Concat(value, key));
+                }
             };
 
             ifNotZeroAppend(span.Days, "d");
@@ -166,18 +268,14 @@ namespace BrakePedal.NETStandard
             return string.Join("", items);
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
         private long GetUnixTimestamp()
         {
-            TimeSpan timeSpan = (CurrentDate() - new DateTime(1970, 1, 1, 0, 0, 0));
+            TimeSpan timeSpan = (_clock.UtcNow.DateTime - new DateTime(1970, 1, 1, 0, 0, 0));
             return (long)timeSpan.TotalSeconds;
-        }
-
-        [Serializable]
-        public class ThrottleCacheItem
-        {
-            public long Count { get; set; }
-
-            public DateTime Expiration { get; set; }
         }
     }
 }

@@ -2,11 +2,22 @@
 using System.Threading.Tasks;
 
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Internal;
 
 using Xunit;
 
 namespace BrakePedal.NETStandard.Tests
 {
+    public class TestClock : ISystemClock
+    {
+        public TestClock(DateTime? value = null)
+        {
+            UtcNow = value ?? DateTime.UtcNow;
+        }
+
+        public DateTimeOffset UtcNow { get; }
+    }
+
     public class MemoryThrottleRepositoryTests
     {
         public class AddOrIncrementWithExpirationMethod
@@ -20,8 +31,7 @@ namespace BrakePedal.NETStandard.Tests
                     .Limit(1)
                     .Over(100);
                 var cache = new MemoryCache(new MemoryCacheOptions());
-                var repository = new MemoryThrottleRepository(cache);
-                repository.CurrentDate = () => new DateTime(2030, 1, 1);
+                var repository = new MemoryThrottleRepository(cache, new TestClock(new DateTime(2030, 1, 1, 0, 0, 0, DateTimeKind.Utc)));
 
                 string id = repository.CreateThrottleKey(key, limiter);
 
@@ -29,7 +39,7 @@ namespace BrakePedal.NETStandard.Tests
                 repository.AddOrIncrementWithExpiration(key, limiter);
 
                 // Assert
-                var item = (MemoryThrottleRepository.ThrottleCacheItem)cache.Get(id);
+                var item = (ThrottleCacheItem)cache.Get(id);
                 Assert.Equal(1L, item.Count);
                 // We're testing a future date by 100 seconds which is 40 seconds + 1 minute
                 Assert.Equal(new DateTime(2030, 1, 1, 0, 1, 40), item.Expiration);
@@ -44,16 +54,15 @@ namespace BrakePedal.NETStandard.Tests
                     .Limit(1)
                     .Over(100);
                 var cache = new MemoryCache(new MemoryCacheOptions());
-                var repository = new MemoryThrottleRepository(cache);
-                repository.CurrentDate = () => new DateTime(2030, 1, 1);
+                var repository = new MemoryThrottleRepository(cache, new TestClock(new DateTime(2030, 1, 1, 0, 0, 0, DateTimeKind.Utc)));
 
-                string id = await repository.CreateThrottleKeyAsync(key, limiter);
+                var id = repository.CreateThrottleKey(key, limiter);
 
                 // Act
                 await repository.AddOrIncrementWithExpirationAsync(key, limiter);
 
                 // Assert
-                var item = (MemoryThrottleRepository.ThrottleCacheItem)cache.Get(id);
+                var item = (ThrottleCacheItem)cache.Get(id);
                 Assert.Equal(1L, item.Count);
                 // We're testing a future date by 100 seconds which is 40 seconds + 1 minute
                 Assert.Equal(new DateTime(2030, 1, 1, 0, 1, 40), item.Expiration);
@@ -68,10 +77,10 @@ namespace BrakePedal.NETStandard.Tests
                     .Limit(1)
                     .Over(100);
                 var cache = new MemoryCache(new MemoryCacheOptions());
-                var repository = new MemoryThrottleRepository(cache);
-                string id = repository.CreateThrottleKey(key, limiter);
+                var repository = new MemoryThrottleRepository(cache, new TestClock(new DateTime(2030, 1, 1)));
+                var id = repository.CreateThrottleKey(key, limiter);
 
-                var cacheItem = new MemoryThrottleRepository.ThrottleCacheItem()
+                var cacheItem = new ThrottleCacheItem()
                 {
                     Count = 1,
                     Expiration = new DateTime(2030, 1, 1)
@@ -84,7 +93,7 @@ namespace BrakePedal.NETStandard.Tests
                 repository.AddOrIncrementWithExpiration(key, limiter);
 
                 // Assert
-                var item = (MemoryThrottleRepository.ThrottleCacheItem)cache.Get(id);
+                var item = (ThrottleCacheItem)cache.Get(id);
                 Assert.Equal(2L, item.Count);
                 Assert.Equal(new DateTime(2030, 1, 1), item.Expiration);
             }
@@ -98,10 +107,10 @@ namespace BrakePedal.NETStandard.Tests
                     .Limit(1)
                     .Over(100);
                 var cache = new MemoryCache(new MemoryCacheOptions());
-                var repository = new MemoryThrottleRepository(cache);
-                string id = repository.CreateThrottleKey(key, limiter);
+                var repository = new MemoryThrottleRepository(cache, new TestClock());
+                var id = repository.CreateThrottleKey(key, limiter);
 
-                var cacheItem = new MemoryThrottleRepository.ThrottleCacheItem()
+                var cacheItem = new ThrottleCacheItem()
                 {
                     Count = 1,
                     Expiration = new DateTime(2030, 1, 1)
@@ -114,7 +123,7 @@ namespace BrakePedal.NETStandard.Tests
                 await repository.AddOrIncrementWithExpirationAsync(key, limiter);
 
                 // Assert
-                var item = (MemoryThrottleRepository.ThrottleCacheItem)cache.Get(id);
+                var item = (ThrottleCacheItem)cache.Get(id);
                 Assert.Equal(2L, item.Count);
                 Assert.Equal(new DateTime(2030, 1, 1), item.Expiration);
             }
@@ -128,14 +137,8 @@ namespace BrakePedal.NETStandard.Tests
                     .Limit(1)
                     .Over(100);
                 var cache = new MemoryCache(new MemoryCacheOptions());
-                var repository = new MemoryThrottleRepository(cache);
-                string id = repository.CreateThrottleKey(key, limiter);
+                var repository = new MemoryThrottleRepository(cache, new TestClock());
 
-                var cacheItem = new MemoryThrottleRepository.ThrottleCacheItem()
-                {
-                    Count = 1,
-                    Expiration = new DateTime(2030, 1, 1)
-                };
 
                 repository.AddOrIncrementWithExpiration(key, limiter);
 
@@ -155,10 +158,10 @@ namespace BrakePedal.NETStandard.Tests
                     .Limit(1)
                     .Over(100);
                 var cache = new MemoryCache(new MemoryCacheOptions());
-                var repository = new MemoryThrottleRepository(cache);
-                string id = repository.CreateThrottleKey(key, limiter);
+                var repository = new MemoryThrottleRepository(cache, new TestClock());
+                var id = repository.CreateThrottleKey(key, limiter);
 
-                var cacheItem = new MemoryThrottleRepository.ThrottleCacheItem()
+                var cacheItem = new ThrottleCacheItem()
                 {
                     Count = 1,
                     Expiration = new DateTime(2030, 1, 1)
@@ -182,7 +185,7 @@ namespace BrakePedal.NETStandard.Tests
                     .Limit(1)
                     .Over(100);
                 var cache = new MemoryCache(new MemoryCacheOptions());
-                var repository = new MemoryThrottleRepository(cache);
+                var repository = new MemoryThrottleRepository(cache, new TestClock());
 
                 // Act
                 var count = repository.GetThrottleCount(key, limiter);
@@ -200,7 +203,7 @@ namespace BrakePedal.NETStandard.Tests
                     .Limit(1)
                     .Over(100);
                 var cache = new MemoryCache(new MemoryCacheOptions());
-                var repository = new MemoryThrottleRepository(cache);
+                var repository = new MemoryThrottleRepository(cache, new TestClock());
 
                 // Act
                 var count = await repository.GetThrottleCountAsync(key, limiter);
@@ -216,7 +219,7 @@ namespace BrakePedal.NETStandard.Tests
             public void HasSerializableAttribute()
             {
                 // Arrange
-                var type = typeof(MemoryThrottleRepository.ThrottleCacheItem);
+                var type = typeof(ThrottleCacheItem);
 
                 // Act
                 var result = type.IsDefined(typeof(SerializableAttribute), false);

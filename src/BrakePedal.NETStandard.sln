@@ -15,6 +15,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "root", "root", "{1627F34F-D
 		..\Directory.Build.targets = ..\Directory.Build.targets
 	EndProjectSection
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{FB6969BA-512E-4CB8-A84A-8006343B9E23}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test", "test", "{2EDFF0A9-32A1-4DB8-A8C8-EE45B48B772B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -36,6 +40,11 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{F2DCB6D2-AC23-4740-BC6F-C3A09D3834AE} = {FB6969BA-512E-4CB8-A84A-8006343B9E23}
+		{C3A38D23-1F08-4958-B123-C1CB8255089B} = {FB6969BA-512E-4CB8-A84A-8006343B9E23}
+		{7240229A-F82F-4462-B1BC-C1C7868A0BDA} = {2EDFF0A9-32A1-4DB8-A8C8-EE45B48B772B}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {0276F8F7-AEE2-427D-A0D7-1D556E78048A}
